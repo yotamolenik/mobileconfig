@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Mapping
 
 import click
-from humanfriendly.tables import format_smart_table
+
+from mobileconfig.mobileconfig import MobileConfig
 
 XML_HEADER = b'<?xml '
 XML_TAIL = b'</plist>'
@@ -37,42 +38,31 @@ def consents(ctx):
 
 
 @cli.command()
-@click.argument('csv_summary', type=click.File('w'), required=False)
+@click.argument('output_file', type=click.File('w'), required=False)
 @click.pass_context
-def payload_types(ctx, csv_summary):
-    """ Print all PayloadType's (with an optional .csv output) """
-    if csv_summary:
-        csv_summary = csv.writer(csv_summary)
+def payload_types(ctx, output_file):
+    """ Print all PayloadTypes with an optional csv file """
+    if output_file:
+        output_file = csv.writer(output_file)
 
     header = ['Display Name', 'PayloadType', 'Description']
 
-    if csv_summary:
-        csv_summary.writerow(header)
+    if output_file:
+        output_file.writerow(header)
 
     rows = []
     for plist in ctx.obj['plists']:
-        display_name = plist['PayloadDisplayName']
-        for payload_content in plist['PayloadContent']:
-            payload_type = payload_content['PayloadType']
-
-            description = ''
-            if payload_type == 'com.apple.system.logging':
-                subsystems = payload_content.get('Subsystems')
-                if subsystems:
-                    description = 'Subsystems: '
-                    description += ', '.join(subsystems.keys())
-            elif payload_type == 'com.apple.defaults.managed':
-                for inner_payload_content in payload_content['PayloadContent']:
-                    domain = inner_payload_content.get('DefaultsDomainName')
-                    data_keys = ', '.join(inner_payload_content.get('DefaultsData').keys())
-                    description = f'{domain}: {data_keys}'
-
+        mobileconfig = MobileConfig(plist)
+        display_name = mobileconfig.payload_display_name
+        print('display name is', display_name)
+        for payload_content in mobileconfig.payload_content:
+            print('payload content is ', payload_content)
+            payload_type = payload_content.payload_type
+            description = str(payload_content)
             rows.append((display_name, payload_type, description))
 
-    if csv_summary:
-        csv_summary.writerows(rows)
-
-    print(format_smart_table(rows, header))
+    if output_file:
+        output_file.writerows(rows)
 
 
 @cli.command()
