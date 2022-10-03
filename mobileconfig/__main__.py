@@ -76,6 +76,27 @@ def payload_types(ctx, csv_summary):
 
 
 @cli.command()
+@click.pass_context
+def gist(ctx):
+    """ print device configurations in input dir for all profiles """
+    for plist in ctx.obj['plists']:
+        display_name = plist['PayloadDisplayName']
+        print(display_name+':')
+        for payload_content in plist['PayloadContent']:
+            payload_type = payload_content['PayloadType']
+            print('\t' + payload_type)
+            if payload_type == 'com.apple.system.logging':
+                subsystems = payload_content.get('Subsystems')
+                if subsystems:
+                    for subsystem in payload_content['Subsystems']:
+                        print('\t\t'+subsystem)
+            elif payload_type == 'com.apple.defaults.managed':
+                for inner_payload_content in payload_content['PayloadContent']:
+                    print('\t' + inner_payload_content['DefaultsDomainName'])
+                    print('\t\t' + str(inner_payload_content['DefaultsData']))
+
+
+@cli.command()
 @click.argument('output', type=click.Path(dir_okay=True, file_okay=False, exists=False))
 @click.pass_context
 def extract(ctx, output):
