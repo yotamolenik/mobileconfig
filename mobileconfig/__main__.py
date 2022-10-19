@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Mapping
 
 import click
+import mdutils
 
-from mobileconfig.mobileconfig import MobileConfig
+from mobileconfig.mobileconfig import MobileConfig, ManagedPayload
 
 XML_HEADER = b'<?xml '
 XML_TAIL = b'</plist>'
@@ -38,38 +39,48 @@ def consents(ctx):
 
 
 @cli.command()
-@click.argument('output_file', type=click.File('w'), required=False)
+@click.argument('output_file', type=click.File('w'), required=True)
+@click.argument('output_type', type=click.Choice(['csv', 'md']), required=True)
 @click.pass_context
-def payload_types(ctx, output_file):
-    """ Print all PayloadTypes with an optional csv file """
-    if output_file:
+def payload_types(ctx, output_file, output_type):
+    """ Print all PayloadTypes to either a csv or md file """
+    if output_type == 'csv':
         output_file = csv.writer(output_file)
+    if output_type == 'md':
+        mdfile = mdutils.MdUtils(file_name=output_file.name, title='Profiles')
 
     header = ['Display Name', 'PayloadType', 'Description']
 
-    if output_file:
+    if output_type == 'csv':
         output_file.writerow(header)
 
-    rows = []
+    rows = ['Display Name', 'PayloadType', 'Description']
     for plist in ctx.obj['plists']:
         mobileconfig = MobileConfig(plist)
         display_name = mobileconfig.payload_display_name
-        print('display name is', display_name)
         for payload_content in mobileconfig.payload_content:
-            print('payload content is ', payload_content)
             payload_type = payload_content.payload_type
-            description = str(payload_content)
-            rows.append((display_name, payload_type, description))
 
-    if output_file:
+            if isinstance(payload_content, ManagedPayload):
+                for domain in payload_content.domains:
+                    rows.extend([display_name, payload_type, f'{domain.domain}: {", ".join(domain.keys)}'])
+            else:
+                description = str(payload_content)
+                rows.extend([display_name, payload_type, description])
+
+    if output_type == 'csv':
         output_file.writerows(rows)
+
+    if output_type == 'md':
+        mdfile.new_table(columns=3, rows=len(rows) // 3, text=rows, text_align='left')
+        mdfile.create_md_file()
 
 
 @cli.command()
 @click.argument('output', type=click.Path(dir_okay=True, file_okay=False, exists=False))
 @click.pass_context
 def extract(ctx, output):
-    """ Extract .plist into given directory """
+    """ Extract the plists into given directory """
     output = Path(output)
     output.mkdir(0o777, exist_ok=True, parents=True)
     for plist in ctx.obj['plists']:

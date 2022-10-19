@@ -1,4 +1,7 @@
+from collections import namedtuple
 from typing import Mapping, List
+
+Domain = namedtuple('Domain', 'domain keys')
 
 
 class PayloadContent:
@@ -15,21 +18,15 @@ class PayloadContent:
         self._plist = plist
 
     @property
-    def payload_content(self):
+    def payload_content(self) -> Mapping:
         return self._plist['PayloadContent']
 
     @property
-    def core_capture_config(self):
-        """ a special property present only in payloads of type com.apple.ManagedClient.preferences """
-        return self._plist['CoreCaptureConfig']
-
-    @property
-    def payload_type(self):
+    def payload_type(self) -> str:
         return self._plist['PayloadType']
 
 
 class LoggingPayload(PayloadContent):
-
     def __repr__(self):
         subsystems = self._plist.get('Subsystems')
         description = ''
@@ -40,15 +37,30 @@ class LoggingPayload(PayloadContent):
 
 
 class ManagedPayload(PayloadContent):
+    @property
+    def domains(self) -> List[Domain]:
+        result = []
+        for inner_payload_content in self.payload_content:
+            domain = inner_payload_content.get('DefaultsDomainName')
+            keys = inner_payload_content.get('DefaultsData').keys()
+            result.append(Domain(domain, keys))
+        return result
+
     def __repr__(self):
-        inner_payload_content = self.payload_content
-        domain = inner_payload_content[0].get('DefaultsDomainName')
-        data_keys = ', '.join(inner_payload_content[0].get('DefaultsData').keys())
-        description = f'{domain}: {data_keys}'
+        description = ''
+        for inner_payload_content in self.payload_content:
+            domain = inner_payload_content.get('DefaultsDomainName')
+            keys = ', '.join(inner_payload_content.get('DefaultsData').keys())
+            description += f'{domain}: {keys}'
         return description
 
 
 class CoreCapture(PayloadContent):
+    @property
+    def core_capture_config(self) -> List[str]:
+        """ a special property present only in payloads of type com.apple.ManagedClient.preferences """
+        return self._plist['CoreCaptureConfig'].keys()
+
     def __repr__(self):
         return str(self.core_capture_config)
 
