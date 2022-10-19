@@ -3,11 +3,10 @@ import plistlib
 from pathlib import Path
 from typing import Mapping
 import mdutils
-
 import click
 
-# im not yet sure why, but pycharm thinks this import is wrong. in fact it works perfectly fine on my terminal
-from mobileconfig import MobileConfig
+from mobileconfig.mobileconfig import MobileConfig
+
 
 XML_HEADER = b'<?xml '
 XML_TAIL = b'</plist>'
@@ -40,60 +39,35 @@ def consents(ctx):
 
 
 @cli.command()
-@click.argument('output_file', type=click.File('w'), required=False)
-# @click.option('--output_type', type=click.Choice(['csv', 'md']))
+@click.argument('output_file', type=click.File('w'), required=True)
+@click.argument('output_type', type=click.Choice(['csv', 'md']), required=True)
 @click.pass_context
-def payload_types(ctx, output_file):
+def payload_types(ctx, output_file, output_type):
     """ Print all PayloadTypes to either a csv or md file """
-    if output_file:
+    if output_type == 'csv':
         output_file = csv.writer(output_file)
+    if output_type == 'md':
+        mdfile = mdutils.MdUtils(file_name=output_file.name, title='Profiles')
 
     header = ['Display Name', 'PayloadType', 'Description']
 
-    if output_file:
+    if output_type == 'csv':
         output_file.writerow(header)
-    # if output_type == 'md':
-    #     mdfile = mdutils.MdUtils(file_name='Example_Markdown', title='Markdown File Example')
 
-    rows = []
+    rows = ['Display Name', 'PayloadType', 'Description']
     for plist in ctx.obj['plists']:
         mobileconfig = MobileConfig(plist)
         display_name = mobileconfig.payload_display_name
-        print('display name is', display_name)
         for payload_content in mobileconfig.payload_content:
-            print('payload content is ', payload_content)
             payload_type = payload_content.payload_type
             description = str(payload_content)
-            rows.append((display_name, payload_type, description))
+            rows.extend([display_name, payload_type, description])
 
-    if output_file:
+    if output_type == 'csv':
         output_file.writerows(rows)
-    # if output_type == 'md':
-    #     mdfile.create_md_file()
-
-
-@cli.command()
-@click.pass_context
-def gist(ctx):
-    """ create a markdown file containing device configurations in input dir for all profiles """
-    mdfile = mdutils.MdUtils(file_name='profiles', title='profiles list')
-    for plist in ctx.obj['plists']:
-        display_name = plist['PayloadDisplayName']
-        mdfile.new_header(level=1, title='Profile Name: ' + display_name)
-        mdfile.new_header(level=2, title='payload types:')
-        for payload_content in plist['PayloadContent']:
-            payload_type = payload_content['PayloadType']
-            mdfile.new_header(level=3, title='payload type: ' + payload_type)
-            if payload_type == 'com.apple.system.logging':
-                subsystems = payload_content.get('Subsystems')
-                if subsystems:
-                    for subsystem in payload_content['Subsystems']:
-                        mdfile.new_header(level=4, title='subsystem: ' + subsystem)
-            elif payload_type == 'com.apple.defaults.managed':
-                for inner_payload_content in payload_content['PayloadContent']:
-                    mdfile.new_header(level=3, title='Domain name: ' + inner_payload_content['DefaultsDomainName'])
-                    mdfile.new_header(level=4, title='inner payload values: ' + str(inner_payload_content['DefaultsData']))
-    mdfile.create_md_file()
+    if output_type == 'md':
+        mdfile.new_table(columns=3, rows=len(rows) // 3, text=rows, text_align='center')
+        mdfile.create_md_file()
 
 
 @cli.command()

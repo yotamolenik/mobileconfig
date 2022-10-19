@@ -42,10 +42,11 @@ class LoggingPayload(PayloadContent):
 class ManagedPayload(PayloadContent):
 
     def __repr__(self):
-        inner_payload_content = self.payload_content
-        domain = inner_payload_content[0].get('DefaultsDomainName')
-        data_keys = ', '.join(inner_payload_content[0].get('DefaultsData').keys())
-        description = f'{domain}: {data_keys}'
+        description = ''
+        for inner_payload_content in self.payload_content:
+            domain = inner_payload_content.get('DefaultsDomainName')
+            keys = ', '.join(inner_payload_content.get('DefaultsData').keys())
+            description += f'DOMAIN: {domain}, KEYS:{keys}, '
         return description
 
 
