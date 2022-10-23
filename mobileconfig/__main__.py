@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Mapping
 
 import click
-from humanfriendly.tables import format_smart_table
+import mdutils
+
+from mobileconfig.mobileconfig import MobileConfig, ManagedPayload
 
 XML_HEADER = b'<?xml '
 XML_TAIL = b'</plist>'
@@ -37,49 +39,48 @@ def consents(ctx):
 
 
 @cli.command()
-@click.argument('csv_summary', type=click.File('w'), required=False)
+@click.argument('output_file', type=click.File('w'), required=True)
+@click.argument('output_type', type=click.Choice(['csv', 'md']), required=True)
 @click.pass_context
-def payload_types(ctx, csv_summary):
-    """ Print all PayloadType's (with an optional .csv output) """
-    if csv_summary:
-        csv_summary = csv.writer(csv_summary)
+def payload_types(ctx, output_file, output_type):
+    """ Print all PayloadTypes to either a csv or md file """
+    if output_type == 'csv':
+        output_file = csv.writer(output_file)
+    if output_type == 'md':
+        mdfile = mdutils.MdUtils(file_name=output_file.name, title='Profiles')
 
     header = ['Display Name', 'PayloadType', 'Description']
 
-    if csv_summary:
-        csv_summary.writerow(header)
+    if output_type == 'csv':
+        output_file.writerow(header)
 
-    rows = []
+    rows = ['Display Name', 'PayloadType', 'Description']
     for plist in ctx.obj['plists']:
-        display_name = plist['PayloadDisplayName']
-        for payload_content in plist['PayloadContent']:
-            payload_type = payload_content['PayloadType']
+        mobileconfig = MobileConfig(plist)
+        display_name = mobileconfig.payload_display_name
+        for payload_content in mobileconfig.payload_content:
+            payload_type = payload_content.payload_type
 
-            description = ''
-            if payload_type == 'com.apple.system.logging':
-                subsystems = payload_content.get('Subsystems')
-                if subsystems:
-                    description = 'Subsystems: '
-                    description += ', '.join(subsystems.keys())
-            elif payload_type == 'com.apple.defaults.managed':
-                for inner_payload_content in payload_content['PayloadContent']:
-                    domain = inner_payload_content.get('DefaultsDomainName')
-                    data_keys = ', '.join(inner_payload_content.get('DefaultsData').keys())
-                    description = f'{domain}: {data_keys}'
+            if isinstance(payload_content, ManagedPayload):
+                for domain in payload_content.domains:
+                    rows.extend([display_name, payload_type, f'{domain.domain}: {", ".join(domain.keys)}'])
+            else:
+                description = str(payload_content)
+                rows.extend([display_name, payload_type, description])
 
-            rows.append((display_name, payload_type, description))
+    if output_type == 'csv':
+        output_file.writerows(rows)
 
-    if csv_summary:
-        csv_summary.writerows(rows)
-
-    print(format_smart_table(rows, header))
+    if output_type == 'md':
+        mdfile.new_table(columns=3, rows=len(rows) // 3, text=rows, text_align='left')
+        mdfile.create_md_file()
 
 
 @cli.command()
 @click.argument('output', type=click.Path(dir_okay=True, file_okay=False, exists=False))
 @click.pass_context
 def extract(ctx, output):
-    """ Extract .plist into given directory """
+    """ Extract the plists into given directory """
     output = Path(output)
     output.mkdir(0o777, exist_ok=True, parents=True)
     for plist in ctx.obj['plists']:

@@ -14,7 +14,11 @@ Options:
 
 Commands:
   consents       Print all user consents
-  extract        Extract .plist into given directory
-  payload-types  Print all PayloadType's (with an optional .csv output)
+  extract        Extract the plists into given directory
+  payload-types  print a summary of PayloadTypes to either a csv or md file
 ```
 
+The _extract_ command also gives all values for the keys inside payload-types
+
+For your convenience, a link to the gist of all current profiles:  
+https://gist.github.com/yotamolenik/154d612900a2b3ce277226fcaebbb2ca
