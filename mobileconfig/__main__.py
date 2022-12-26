@@ -49,12 +49,8 @@ def payload_types(ctx, output_file, output_type):
     if output_type == 'md':
         mdfile = mdutils.MdUtils(file_name=output_file.name, title='Profiles')
 
-    header = ['Display Name', 'PayloadType', 'Description']
 
-    if output_type == 'csv':
-        output_file.writerow(header)
-
-    rows = ['Display Name', 'PayloadType', 'Description']
+    rows = [('Display Name', 'PayloadType', 'Description')]
     for plist in ctx.obj['plists']:
         mobileconfig = MobileConfig(plist)
         display_name = mobileconfig.payload_display_name
@@ -63,10 +59,10 @@ def payload_types(ctx, output_file, output_type):
 
             if isinstance(payload_content, ManagedPayload):
                 for domain in payload_content.domains:
-                    rows.extend([display_name, payload_type, f'{domain.domain}: {", ".join(domain.keys)}'])
+                    rows.append((display_name, payload_type, f'{domain.domain}: {", ".join(domain.keys)}'))
             else:
                 description = str(payload_content)
-                rows.extend([display_name, payload_type, description])
+                rows.append((display_name, payload_type, description))
 
     if output_type == 'csv':
         output_file.writerows(rows)
